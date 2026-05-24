@@ -227,6 +227,13 @@ body {
 }
 .btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
 
+.btn-danger {
+  background: #fff;
+  color: #dc2626;
+  border: 1.5px solid #dc2626;
+}
+.btn-danger:hover:not(:disabled) { background: #fef2f2; }
+
 /* ============================================================
    Results Header
    ============================================================ */

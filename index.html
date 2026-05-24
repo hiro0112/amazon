@@ -22,19 +22,21 @@
 
       <div class="upload-grid">
 
+        <!-- 商品コード（複数可） -->
         <div class="upload-box" id="master-box">
-          <input type="file" id="master-file" accept=".csv">
+          <input type="file" id="master-file" accept=".csv" multiple>
           <label for="master-file" class="upload-label">
             <span class="upload-icon">📋</span>
             <span class="upload-text">
               <strong>商品コード CSV</strong>
-              <small>（自社商品マスタ）</small>
+              <small>（自社商品マスタ・複数可）</small>
               <em>クリックまたはドラッグ＆ドロップ</em>
             </span>
           </label>
-          <div class="file-badge hidden" id="master-badge"></div>
+          <div class="file-list hidden" id="master-list"></div>
         </div>
 
+        <!-- Amazon売上（複数可） -->
         <div class="upload-box" id="sales-box">
           <input type="file" id="sales-file" accept=".csv" multiple>
           <label for="sales-file" class="upload-label">
@@ -52,7 +54,8 @@
 
       <div class="upload-actions">
         <button id="analyze-btn" class="btn btn-primary" disabled>分析する</button>
-        <p class="status-hint" id="upload-hint">両ファイルを読み込んでください</p>
+        <button id="clear-btn" class="btn btn-danger">データをクリア</button>
+        <p class="status-hint" id="upload-hint">Amazon売上CSVを読み込んでください</p>
       </div>
     </section>
 
@@ -102,6 +105,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="js/main.js"></script>
 </body>

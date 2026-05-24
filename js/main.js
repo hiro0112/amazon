@@ -1,10 +1,15 @@
 'use strict';
 
+// chartjs-plugin-datalabels を登録（CDN読み込み済みの場合のみ）
+if (typeof ChartDataLabels !== 'undefined') {
+  Chart.register(ChartDataLabels);
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
-let masterData = null;  // { skuToGroup: Map, groupInfo: Map }
-let allSales   = [];    // [{ sku, monthKey, monthLabel, total, units }]
-let months     = [];    // sorted unique monthKeys
-let chartInst  = null;
+let masterData   = null;  // { skuToGroup: Map, groupInfo: Map }
+let allSales     = [];    // [{ sku, monthKey, monthLabel, total, units }]
+let months       = [];    // sorted unique monthKeys
+let chartInst    = null;
 let activeMonths = new Set(); // empty = 全期間
 
 // ─── CSV Parser (RFC 4180) ────────────────────────────────────────────────────
@@ -26,7 +31,6 @@ function parseCSV(text) {
     }
   }
   if (field || row.length) { row.push(field); rows.push(row); }
-  // Drop empty trailing rows
   while (rows.length && rows[rows.length - 1].every(c => !c.trim())) rows.pop();
   return rows;
 }
@@ -35,15 +39,12 @@ function parseCSV(text) {
 async function readFileText(file) {
   const buf = await file.arrayBuffer();
   const bytes = new Uint8Array(buf);
-  // UTF-8 BOM
   if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
     return new TextDecoder('utf-8').decode(buf.slice(3));
   }
-  // Try UTF-8: count replacement chars
   const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buf);
   const bad = (utf8.match(/�/g) || []).length;
   if (bad === 0 || bad / utf8.length < 0.005) return utf8;
-  // Fallback: Shift-JIS (日本語エクセル保存ファイル対応)
   return new TextDecoder('shift_jis').decode(buf);
 }
 
@@ -51,7 +52,7 @@ async function readFileText(file) {
 // col[0]=商品コード, col[1]=商品名, col[22]=代表商品コード
 function buildMaster(rows) {
   const skuToGroup = new Map();
-  const groupInfo  = new Map(); // groupCode → { names[], displayName }
+  const groupInfo  = new Map();
 
   for (let i = 1; i < rows.length; i++) {
     const c = rows[i];
@@ -70,17 +71,22 @@ function buildMaster(rows) {
   return { skuToGroup, groupInfo };
 }
 
-// サイズ/カラーのサフィックスを除いた商品ベース名を求める
+// 複数マスタCSVをマージ（ヘッダーは先頭ファイルのみ使用）
+function mergeMasterRows(rowSets) {
+  if (!rowSets.length) return [];
+  const header = rowSets[0][0];
+  const dataRows = rowSets.flatMap(rows => rows.slice(1));
+  return [header, ...dataRows];
+}
+
 function computeDisplayName(names, fallback) {
   if (!names.length) return fallback;
 
-  // パターン1: アンダースコア区切り "商品名_カラー_サイズ"
   if (names.length > 1 && names.every(n => n.includes('_'))) {
     const base = names[0].split('_')[0].trim();
     if (base.length >= 3) return base;
   }
 
-  // パターン2: 最長共通前方一致
   let prefix = names[0];
   for (const n of names.slice(1)) {
     let k = 0;
@@ -91,7 +97,6 @@ function computeDisplayName(names, fallback) {
   prefix = prefix.replace(/[\s_\-ー・]+$/, '').trim();
   if (prefix.length >= 5) return prefix;
 
-  // パターン3: 末尾のサイズコードを除去
   return names[0]
     .replace(/[\s_][A-Z]?\d{2,3}$/, '')
     .replace(/[\s_][SMLX]{1,3}$/, '')
@@ -103,7 +108,7 @@ function computeDisplayName(names, fallback) {
 function parseSales(rows, filename) {
   const m = filename.match(/(\d{4})(\d{2})/);
   const monthKey   = m ? `${m[1]}-${m[2]}` : '不明';
-  const monthLabel = m ? `${parseInt(m[2])}月` : '不明';
+  const monthLabel = m ? `${m[1]}年${parseInt(m[2])}月` : '不明';
 
   const out = [];
   for (let i = 1; i < rows.length; i++) {
@@ -121,7 +126,6 @@ function parseSales(rows, filename) {
 // ─── 集計 ─────────────────────────────────────────────────────────────────────
 function aggregate(salesRows, master) {
   const { skuToGroup, groupInfo } = master;
-  // groupCode → Map(monthKey → { total, units, label })
   const agg = new Map();
 
   for (const r of salesRows) {
@@ -137,7 +141,6 @@ function aggregate(salesRows, master) {
   return agg;
 }
 
-// 選択月で絞った結果行を生成（売上降順）
 function buildRows(agg, groupInfo, selectedMonths) {
   const allSelected = selectedMonths.size === 0;
   const rows = [];
@@ -203,7 +206,7 @@ function renderTable(rows) {
   });
 }
 
-// ─── Rendering: グラフ ────────────────────────────────────────────────────────
+// ─── Rendering: グラフ（datalabels付き） ─────────────────────────────────────
 function renderChart(rows) {
   const top    = rows.slice(0, 15);
   const labels = top.map(r => r.name.length > 28 ? r.name.slice(0, 28) + '…' : r.name);
@@ -215,6 +218,8 @@ function renderChart(rows) {
 
   const ctx = document.getElementById('chart').getContext('2d');
   if (chartInst) chartInst.destroy();
+
+  const hasDatalabels = typeof ChartDataLabels !== 'undefined';
 
   chartInst = new Chart(ctx, {
     type: 'bar',
@@ -232,13 +237,38 @@ function renderChart(rows) {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { right: hasDatalabels ? 190 : 10 } },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => `  ${ctx.parsed.x.toLocaleString()} 円`
+            label: ctx => {
+              const r = top[ctx.dataIndex];
+              return [
+                `  売上：${ctx.parsed.x.toLocaleString()} 円`,
+                `  販売個数：${r?.units?.toLocaleString() || 0} 個`,
+              ];
+            }
           }
-        }
+        },
+        // datalabels: 売上金額と販売個数をバーの外側に表示
+        datalabels: hasDatalabels ? {
+          anchor: 'end',
+          align: 'end',
+          clamp: false,
+          formatter: (value, ctx) => {
+            const r = top[ctx.dataIndex];
+            const sales = value >= 1_000_000
+              ? (value / 1_000_000).toFixed(1) + 'M'
+              : value >= 1_000
+                ? (value / 1_000).toFixed(0) + 'K'
+                : value.toLocaleString();
+            return `¥${sales}  ${r?.units?.toLocaleString() || 0}個`;
+          },
+          color: '#374151',
+          font: { size: 11, weight: '600', family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+          padding: { left: 8 },
+        } : false,
       },
       scales: {
         x: {
@@ -263,7 +293,7 @@ function renderMonthChips() {
   const container = document.getElementById('month-chips');
   container.innerHTML = '';
 
-  const allChip = makeChip('すべて', true);
+  const allChip = makeChip('総合計', true);
   allChip.addEventListener('click', () => {
     activeMonths.clear();
     container.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
@@ -311,39 +341,79 @@ function refresh() {
   renderChart(rows);
 }
 
+// ─── クリア ───────────────────────────────────────────────────────────────────
+function clearAll() {
+  masterData = null;
+  allSales   = [];
+  months     = [];
+  activeMonths.clear();
+
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+
+  // ファイル入力をリセット
+  ['master-file', 'sales-file'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+
+  // アップロードボックスのstateをリセット
+  ['master-box', 'sales-box'].forEach(id => {
+    document.getElementById(id).classList.remove('loaded', 'drag-over');
+  });
+
+  ['master-list', 'sales-list'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    el.classList.add('hidden');
+  });
+
+  document.getElementById('results-section').classList.add('hidden');
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('upload-hint').textContent = 'Amazon売上CSVを読み込んでください';
+}
+
 // ─── Excel Export (SheetJS) ───────────────────────────────────────────────────
+// Excelフォーミュラインジェクション対策: =, +, -, @ で始まる文字列を無害化
+function safeCell(value) {
+  if (typeof value === 'string' && /^[=+\-@]/.test(value)) {
+    return '\'' + value;
+  }
+  return value;
+}
+
 function exportExcel() {
   if (!masterData || !allSales.length) return;
 
   const wb  = XLSX.utils.book_new();
   const agg = aggregate(allSales, masterData);
+  const allRows = buildRows(agg, masterData.groupInfo, new Set());
 
   // 合計シート
-  const allRows = buildRows(agg, masterData.groupInfo, new Set());
   const summaryData = [['順位', '商品名', '合計売上（円）', '販売個数']];
-  allRows.forEach((r, i) => summaryData.push([i + 1, r.name, r.total, r.units]));
+  allRows.forEach((r, i) => summaryData.push([i + 1, safeCell(r.name), r.total, r.units]));
 
   const ws0 = XLSX.utils.aoa_to_sheet(summaryData);
-  // 列幅設定
   ws0['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 18 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, ws0, '合計');
 
-  // 月別シート
+  // 月別シート（月ごとの売上降順で出力）
   months.forEach(mk => {
     const label = allSales.find(r => r.monthKey === mk)?.monthLabel || mk;
     const monthData = [['順位', '商品名', '売上（円）', '販売個数']];
     let rank = 1;
-    // 当月売上で降順ソート
+
     const monthRows = allRows
       .map(r => ({ ...r, mTotal: r.monthMap.get(mk)?.total || 0, mUnits: r.monthMap.get(mk)?.units || 0 }))
       .filter(r => r.mTotal > 0)
       .sort((a, b) => b.mTotal - a.mTotal);
-    monthRows.forEach(r => monthData.push([rank++, r.name, r.mTotal, r.mUnits]));
+
+    monthRows.forEach(r => monthData.push([rank++, safeCell(r.name), r.mTotal, r.mUnits]));
 
     if (monthData.length > 1) {
       const ws = XLSX.utils.aoa_to_sheet(monthData);
       ws['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 15 }, { wch: 10 }];
-      XLSX.utils.book_append_sheet(wb, ws, label);
+      // Excel シート名に使えない文字を除去 ( [ ] : * ? / \ )
+      const sheetName = label.replace(/[\[\]:*?/\\]/g, '').slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
   });
 
@@ -365,24 +435,51 @@ document.addEventListener('DOMContentLoaded', () => {
   const salesInput  = document.getElementById('sales-file');
   const analyzeBtn  = document.getElementById('analyze-btn');
   const exportBtn   = document.getElementById('export-btn');
+  const clearBtn    = document.getElementById('clear-btn');
 
-  // ── 商品コードCSV ──────────────────────────────────────────────────────────
+  // ── 商品コードCSV（複数可） ────────────────────────────────────────────────
   masterInput.addEventListener('change', async () => {
-    const file = masterInput.files[0];
-    if (!file) return;
-    try {
-      const text = await readFileText(file);
-      const rows = parseCSV(text);
-      masterData = buildMaster(rows);
-      const box = document.getElementById('master-box');
-      box.classList.add('loaded');
-      const badge = document.getElementById('master-badge');
-      badge.textContent = `✓ ${file.name}（${masterData.groupInfo.size}商品グループ）`;
-      badge.classList.remove('hidden');
-    } catch (e) {
-      alert('商品コードCSVの読み込みに失敗しました: ' + e.message);
+    const files = Array.from(masterInput.files);
+    if (!files.length) return;
+
+    const listEl = document.getElementById('master-list');
+    listEl.innerHTML = '';
+
+    const rowSets = [];
+    let totalGroups = 0;
+
+    for (const file of files) {
+      try {
+        const text = await readFileText(file);
+        const rows = parseCSV(text);
+        rowSets.push(rows);
+        const p = document.createElement('p');
+        p.textContent = `✓ ${file.name}`;
+        listEl.appendChild(p);
+      } catch (e) {
+        const p = document.createElement('p');
+        p.style.color = '#dc2626';
+        p.textContent = `✗ ${file.name}: ${e.message}`;
+        listEl.appendChild(p);
+      }
+    }
+
+    if (rowSets.length) {
+      const merged = mergeMasterRows(rowSets);
+      masterData = buildMaster(merged);
+      totalGroups = masterData.groupInfo.size;
+
+      const summary = document.createElement('p');
+      summary.style.cssText = 'font-weight:700; margin-top:4px; color:#16a34a;';
+      summary.textContent = `合計 ${totalGroups} 商品グループ`;
+      listEl.appendChild(summary);
+
+      document.getElementById('master-box').classList.add('loaded');
+      listEl.classList.remove('hidden');
+    } else {
       masterData = null;
     }
+
     checkReady();
   });
 
@@ -423,7 +520,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── 分析ボタン ──────────────────────────────────────────────────────────────
   analyzeBtn.addEventListener('click', () => {
-    // 商品コードCSVがない場合は MSKU をそのまま代表コードとして処理
     if (!masterData) {
       const skuToGroup = new Map();
       const groupInfo  = new Map();
@@ -445,6 +541,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Excelダウンロード ────────────────────────────────────────────────────────
   exportBtn.addEventListener('click', exportExcel);
+
+  // ── データクリア ─────────────────────────────────────────────────────────────
+  clearBtn.addEventListener('click', clearAll);
 
   // ── ドラッグ＆ドロップ ───────────────────────────────────────────────────────
   ['master-box', 'sales-box'].forEach(id => {

@@ -106,7 +106,7 @@ function computeDisplayName(names, fallback) {
 }
 
 // ─── Amazon 売上CSV パーサー ──────────────────────────────────────────────────
-// col[6]=MSKU(自社品番), col[13]=純利益合計(売上合計), col[14]=1個あたり売上
+// col[6]=MSKU(自社品番), col[11]=実際の販売点数, col[13]=純売上
 function parseSales(rows, filename) {
   const m = filename.match(/(\d{4})(\d{2})/);
   const monthKey   = m ? `${m[1]}-${m[2]}` : '不明';
@@ -115,11 +115,10 @@ function parseSales(rows, filename) {
   const out = [];
   for (let i = 1; i < rows.length; i++) {
     const c = rows[i];
-    const sku     = c[6]?.trim();
-    const total   = parseFloat(c[13]);
-    const perUnit = parseFloat(c[14]);
+    const sku   = c[6]?.trim();
+    const total = parseFloat(c[13]);
+    const units = parseInt(c[11], 10) || 0;
     if (!sku || !isFinite(total) || total <= 0) continue;
-    const units = (isFinite(perUnit) && perUnit > 0) ? Math.round(total / perUnit) : 0;
     out.push({ sku, monthKey, monthLabel, total, units });
   }
   return out;

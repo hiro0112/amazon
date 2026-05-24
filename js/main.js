@@ -106,7 +106,7 @@ function computeDisplayName(names, fallback) {
 }
 
 // ─── Amazon 売上CSV パーサー ──────────────────────────────────────────────────
-// col[6]=MSKU(自社品番), col[11]=実際の販売点数, col[13]=純売上
+// col[3]=親ASIN, col[6]=MSKU(自社品番), col[11]=実際の販売点数, col[13]=純売上
 function parseSales(rows, filename) {
   const m = filename.match(/(\d{4})(\d{2})/);
   const monthKey   = m ? `${m[1]}-${m[2]}` : '不明';
@@ -116,22 +116,25 @@ function parseSales(rows, filename) {
   for (let i = 1; i < rows.length; i++) {
     const c = rows[i];
     const sku   = c[6]?.trim();
+    const asin  = c[3]?.trim() || '';
     const total = parseFloat(c[13]);
     const units = parseInt(c[11], 10) || 0;
     if (!sku || !isFinite(total) || total <= 0) continue;
-    out.push({ sku, monthKey, monthLabel, total, units });
+    out.push({ sku, asin, monthKey, monthLabel, total, units });
   }
   return out;
 }
 
 // ─── 集計 ─────────────────────────────────────────────────────────────────────
 function aggregate(salesRows, master) {
-  const { skuToGroup, groupInfo } = master;
-  const agg = new Map();
+  const { skuToGroup } = master;
+  const agg       = new Map();
+  const groupAsin = new Map();
 
   for (const r of salesRows) {
     const gc = skuToGroup.get(r.sku) || r.sku;
     if (!agg.has(gc)) agg.set(gc, new Map());
+    if (!groupAsin.has(gc) && r.asin) groupAsin.set(gc, r.asin);
     const mm = agg.get(gc);
     if (!mm.has(r.monthKey)) mm.set(r.monthKey, { total: 0, units: 0, label: r.monthLabel });
     const e = mm.get(r.monthKey);
@@ -139,10 +142,10 @@ function aggregate(salesRows, master) {
     e.units  += r.units;
   }
 
-  return agg;
+  return { agg, groupAsin };
 }
 
-function buildRows(agg, groupInfo, selectedMonths) {
+function buildRows(agg, groupInfo, selectedMonths, groupAsin = new Map()) {
   const allSelected = selectedMonths.size === 0;
   const rows = [];
 
@@ -156,7 +159,12 @@ function buildRows(agg, groupInfo, selectedMonths) {
     }
     if (total <= 0) continue;
     const info = groupInfo.get(gc);
-    rows.push({ groupCode: gc, name: info?.displayName || gc, total, units, monthMap: mm });
+    rows.push({
+      groupCode: gc,
+      name: info?.displayName || gc,
+      asin: groupAsin.get(gc) || '',
+      total, units, monthMap: mm,
+    });
   }
 
   rows.sort((a, b) => b.total - a.total);
@@ -335,8 +343,8 @@ function makeChip(label, active) {
 // ─── Refresh ──────────────────────────────────────────────────────────────────
 function refresh() {
   if (!masterData || !allSales.length) return;
-  const agg  = aggregate(allSales, masterData);
-  const rows = buildRows(agg, masterData.groupInfo, activeMonths);
+  const { agg, groupAsin } = aggregate(allSales, masterData);
+  const rows = buildRows(agg, masterData.groupInfo, activeMonths, groupAsin);
   renderSummary(rows);
   renderTable(rows);
   renderChart(rows);
@@ -385,21 +393,21 @@ function exportExcel() {
   if (!masterData || !allSales.length) return;
 
   const wb  = XLSX.utils.book_new();
-  const agg = aggregate(allSales, masterData);
-  const allRows = buildRows(agg, masterData.groupInfo, new Set());
+  const { agg, groupAsin } = aggregate(allSales, masterData);
+  const allRows = buildRows(agg, masterData.groupInfo, new Set(), groupAsin);
 
   // 合計シート
-  const summaryData = [['順位', '商品名', '合計売上（円）', '販売個数']];
-  allRows.forEach((r, i) => summaryData.push([i + 1, safeCell(r.name), r.total, r.units]));
+  const summaryData = [['順位', '商品名', '親ASIN', '合計売上（円）', '販売個数']];
+  allRows.forEach((r, i) => summaryData.push([i + 1, safeCell(r.name), safeCell(r.asin), r.total, r.units]));
 
   const ws0 = XLSX.utils.aoa_to_sheet(summaryData);
-  ws0['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 18 }, { wch: 10 }];
+  ws0['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 14 }, { wch: 18 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, ws0, '合計');
 
   // 月別シート（月ごとの売上降順で出力）
   months.forEach(mk => {
     const label = allSales.find(r => r.monthKey === mk)?.monthLabel || mk;
-    const monthData = [['順位', '商品名', '売上（円）', '販売個数']];
+    const monthData = [['順位', '商品名', '親ASIN', '売上（円）', '販売個数']];
     let rank = 1;
 
     const monthRows = allRows
@@ -407,11 +415,11 @@ function exportExcel() {
       .filter(r => r.mTotal > 0)
       .sort((a, b) => b.mTotal - a.mTotal);
 
-    monthRows.forEach(r => monthData.push([rank++, safeCell(r.name), r.mTotal, r.mUnits]));
+    monthRows.forEach(r => monthData.push([rank++, safeCell(r.name), safeCell(r.asin), r.mTotal, r.mUnits]));
 
     if (monthData.length > 1) {
       const ws = XLSX.utils.aoa_to_sheet(monthData);
-      ws['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 15 }, { wch: 10 }];
+      ws['!cols'] = [{ wch: 6 }, { wch: 50 }, { wch: 14 }, { wch: 15 }, { wch: 10 }];
       // Excel シート名に使えない文字を除去 ( [ ] : * ? / \ )
       const sheetName = label.replace(/[\[\]:*?/\\]/g, '').slice(0, 31);
       XLSX.utils.book_append_sheet(wb, ws, sheetName);

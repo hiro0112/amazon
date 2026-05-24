@@ -66,7 +66,9 @@ function buildMaster(rows) {
   }
 
   for (const [code, info] of groupInfo) {
-    info.displayName = computeDisplayName(info.names, code);
+    info.displayName = (typeof PRODUCT_NAMES !== 'undefined' && PRODUCT_NAMES[code])
+      ? PRODUCT_NAMES[code]
+      : computeDisplayName(info.names, code);
   }
   return { skuToGroup, groupInfo };
 }

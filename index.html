@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazonセラー 売上分析</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <h1>Amazonセラー 売上分析</h1>
+    <p class="subtitle">商品コードCSVとセラー売上CSVをアップロードして分析</p>
+  </header>
+
+  <main>
+
+    <!-- ① アップロード -->
+    <section class="card" id="upload-section">
+      <h2 class="section-title"><span class="step">1</span> ファイルを読み込む</h2>
+
+      <div class="upload-grid">
+
+        <div class="upload-box" id="master-box">
+          <input type="file" id="master-file" accept=".csv">
+          <label for="master-file" class="upload-label">
+            <span class="upload-icon">📋</span>
+            <span class="upload-text">
+              <strong>商品コード CSV</strong>
+              <small>（自社商品マスタ）</small>
+              <em>クリックまたはドラッグ＆ドロップ</em>
+            </span>
+          </label>
+          <div class="file-badge hidden" id="master-badge"></div>
+        </div>
+
+        <div class="upload-box" id="sales-box">
+          <input type="file" id="sales-file" accept=".csv" multiple>
+          <label for="sales-file" class="upload-label">
+            <span class="upload-icon">📊</span>
+            <span class="upload-text">
+              <strong>Amazonセラー 売上 CSV</strong>
+              <small>（複数月まとめて選択可）</small>
+              <em>クリックまたはドラッグ＆ドロップ</em>
+            </span>
+          </label>
+          <div class="file-list hidden" id="sales-list"></div>
+        </div>
+
+      </div>
+
+      <div class="upload-actions">
+        <button id="analyze-btn" class="btn btn-primary" disabled>分析する</button>
+        <p class="status-hint" id="upload-hint">両ファイルを読み込んでください</p>
+      </div>
+    </section>
+
+    <!-- ② 結果 -->
+    <section class="card hidden" id="results-section">
+      <div class="results-header">
+        <h2 class="section-title"><span class="step">2</span> 分析結果</h2>
+        <button id="export-btn" class="btn btn-secondary">📥 Excelダウンロード</button>
+      </div>
+
+      <!-- 月フィルター -->
+      <div class="filter-bar" id="month-filter-bar">
+        <span class="filter-label">期間：</span>
+        <div class="filter-chips" id="month-chips"></div>
+      </div>
+
+      <!-- サマリーカード -->
+      <div class="summary-cards" id="summary-cards"></div>
+
+      <!-- グラフ -->
+      <div class="chart-wrapper">
+        <h3 class="chart-title">売上 TOP15（商品別）</h3>
+        <div class="chart-area">
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <!-- テーブル -->
+      <div class="table-wrapper">
+        <h3 class="table-title">商品別 売上一覧</h3>
+        <table id="result-table">
+          <thead>
+            <tr>
+              <th class="col-rank">順位</th>
+              <th class="col-name">商品名</th>
+              <th class="col-sales">合計売上（円）</th>
+              <th class="col-units">販売個数</th>
+              <th class="col-bar"></th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

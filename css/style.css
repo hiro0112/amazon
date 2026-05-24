@@ -1,0 +1,458 @@
+/* ============================================================
+   Reset & Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Yu Gothic UI', 'Noto Sans JP', sans-serif;
+  background: #eef2f7;
+  color: #1e2a3a;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px 60px;
+}
+
+.app-header {
+  padding: 32px 0 24px;
+  border-bottom: 3px solid #2563eb;
+  margin-bottom: 28px;
+}
+
+.app-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1e2a3a;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.card.hidden { display: none; }
+
+/* ============================================================
+   Section Titles
+   ============================================================ */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e2a3a;
+  margin-bottom: 22px;
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Upload
+   ============================================================ */
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 640px) {
+  .upload-grid { grid-template-columns: 1fr; }
+}
+
+.upload-box {
+  position: relative;
+  border: 2px dashed #c8d6e5;
+  border-radius: 12px;
+  transition: border-color 0.2s, background 0.2s;
+  min-height: 140px;
+}
+
+.upload-box:hover,
+.upload-box.drag-over {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.upload-box.loaded {
+  border-color: #16a34a;
+  border-style: solid;
+  background: #f0fdf4;
+}
+
+.upload-box input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+}
+
+.upload-label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 20px;
+  pointer-events: none;
+  cursor: pointer;
+}
+
+.upload-icon { font-size: 36px; flex-shrink: 0; }
+
+.upload-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.upload-text strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.upload-text small {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.upload-text em {
+  font-size: 11px;
+  font-style: normal;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.file-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #16a34a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 99px;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.file-list {
+  padding: 10px 16px 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.file-list p {
+  font-size: 12px;
+  color: #374151;
+  margin: 2px 0;
+}
+
+.hidden { display: none !important; }
+
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.status-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #374151;
+  border: 1px solid #cbd5e1;
+}
+.btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
+
+/* ============================================================
+   Results Header
+   ============================================================ */
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.results-header .section-title { margin-bottom: 0; }
+
+/* ============================================================
+   Month Filter
+   ============================================================ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 5px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fff;
+  color: #374151;
+  transition: all 0.15s;
+}
+
+.chip:hover { border-color: #2563eb; color: #2563eb; }
+
+.chip.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+/* ============================================================
+   Summary Cards
+   ============================================================ */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 18px;
+  text-align: center;
+}
+
+.summary-card .sc-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.summary-card .sc-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e2a3a;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-card .sc-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 2px;
+}
+
+/* ============================================================
+   Chart
+   ============================================================ */
+.chart-wrapper {
+  margin-bottom: 32px;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.chart-area {
+  position: relative;
+  height: 520px;
+  background: #fafbfc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+/* ============================================================
+   Table
+   ============================================================ */
+.table-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.table-wrapper { overflow-x: auto; }
+
+#result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+#result-table thead th {
+  background: #f1f5f9;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+#result-table tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid #f0f4f8;
+  vertical-align: middle;
+}
+
+#result-table tbody tr:hover td { background: #f8fafc; }
+
+.col-rank { width: 56px; text-align: center; }
+.col-sales, .col-units { width: 160px; text-align: right; }
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.rank-badge.r1 { background: #fef3c7; color: #d97706; }
+.rank-badge.r2 { background: #f1f5f9; color: #64748b; }
+.rank-badge.r3 { background: #fdf6ec; color: #b45309; }
+
+.product-name {
+  max-width: 480px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.sales-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: #1e2a3a;
+}
+
+.units-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #374151;
+}
+
+.col-bar { width: 120px; }
+
+.bar-cell {
+  width: 120px;
+  padding: 9px 14px;
+}
+
+.bar-bg {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* ============================================================
+   Scrollbar
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }

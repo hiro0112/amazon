@@ -655,6 +655,15 @@ body {
 .mx-totals td { border-top: 2px solid #e2e8f0; background: #eef2f7; font-weight: 700; }
 .mx-total-label { color: #374151; }
 
+.mx-other td { background: #fafafa; }
+.mx-other-label {
+  color: #94a3b8;
+  font-size: 12px;
+  font-style: italic;
+  text-align: right;
+  padding-right: 8px;
+}
+
 .matrix-empty {
   color: #64748b;
   font-size: 13px;

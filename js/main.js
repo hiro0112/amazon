@@ -241,11 +241,35 @@ function parseSkuVariants(skuName) {
 }
 
 function sizeCompare(a, b) {
+  // 標準サイズ (S/M/L/LL/3L など)
   const ai = SIZE_ORDER.indexOf(a.toUpperCase());
   const bi = SIZE_ORDER.indexOf(b.toUpperCase());
   if (ai !== -1 && bi !== -1) return ai - bi;
   if (ai !== -1) return -1;
   if (bi !== -1) return 1;
+
+  // ブラサイズ Cup+Band 形式 (A65, B70, C75...)
+  // → カップ字 A<B<C... を第1キー、バンド数を第2キー
+  const braA = a.match(/^([A-G])(\d{2,3})$/i);
+  const braB = b.match(/^([A-G])(\d{2,3})$/i);
+  if (braA && braB) {
+    const cup = braA[1].toUpperCase().localeCompare(braB[1].toUpperCase());
+    return cup !== 0 ? cup : parseInt(braA[2]) - parseInt(braB[2]);
+  }
+  if (braA) return -1;
+  if (braB) return 1;
+
+  // Band+Cup 形式 (65A, 70B...) も同様
+  const bcA = a.match(/^(\d{2,3})([A-G])$/i);
+  const bcB = b.match(/^(\d{2,3})([A-G])$/i);
+  if (bcA && bcB) {
+    const cup = bcA[2].toUpperCase().localeCompare(bcB[2].toUpperCase());
+    return cup !== 0 ? cup : parseInt(bcA[1]) - parseInt(bcB[1]);
+  }
+  if (bcA) return -1;
+  if (bcB) return 1;
+
+  // その他: 数字部分で比較
   const an = parseInt(a.replace(/\D/g, ''), 10) || 0;
   const bn = parseInt(b.replace(/\D/g, ''), 10) || 0;
   return an !== bn ? an - bn : a.localeCompare(b, 'ja');
@@ -255,11 +279,12 @@ function buildColorSizeMatrix(skuRows) {
   const cells      = new Map(); // `color__size` → units
   const colorTotal = new Map();
   const sizeSet    = new Set();
-  let parseable = 0;
+  let parseable  = 0;
+  let otherUnits = 0; // 解析できなかったSKUの合計個数
 
   for (const r of skuRows) {
     const v = parseSkuVariants(r.name);
-    if (!v) continue;
+    if (!v) { otherUnits += r.units; continue; }
     parseable++;
     const key = `${v.color}__${v.size}`;
     cells.set(key, (cells.get(key) || 0) + r.units);
@@ -272,7 +297,7 @@ function buildColorSizeMatrix(skuRows) {
   const sortedColors = [...colorTotal.keys()].sort((a, b) => colorTotal.get(b) - colorTotal.get(a));
   const sortedSizes  = [...sizeSet].sort(sizeCompare);
 
-  return { sortedColors, sortedSizes, cells, colorTotal };
+  return { sortedColors, sortedSizes, cells, colorTotal, otherUnits };
 }
 
 function renderMatrix(groupCode) {
@@ -317,6 +342,14 @@ function renderMatrix(groupCode) {
     html += `<td class="mx-total-cell">${col}</td>`;
   });
   html += `<td class="mx-total-cell">${grand}</td></tr>`;
+
+  // 解析できなかったSKU（合計の整合性を保つため表示）
+  if (matrix.otherUnits > 0) {
+    const colspan = sortedSizes.length + 1;
+    html += `<tr class="mx-other"><td class="mx-color mx-other-label" colspan="${colspan}">その他（カラー・サイズ未解析）</td>`;
+    html += `<td class="mx-total-cell">${matrix.otherUnits}</td></tr>`;
+  }
+
   html += '</tbody></table></div>';
 
   el.innerHTML = html;

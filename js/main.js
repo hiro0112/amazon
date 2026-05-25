@@ -12,6 +12,17 @@ let months       = [];    // sorted unique monthKeys
 let chartInst    = null;
 let activeMonths = new Set(); // empty = 全期間
 
+// ─── LocalStorage ─────────────────────────────────────────────────────────────
+const LS_MASTER = 'amazon_master_v1';
+const LS_SALES  = 'amazon_sales_v1';
+
+function lsSave(key, data) {
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch (_) {}
+}
+function lsLoad(key) {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } catch (_) { return null; }
+}
+
 // ─── CSV Parser (RFC 4180) ────────────────────────────────────────────────────
 function parseCSV(text) {
   const rows = [];
@@ -359,6 +370,9 @@ function clearAll() {
 
   if (chartInst) { chartInst.destroy(); chartInst = null; }
 
+  localStorage.removeItem(LS_MASTER);
+  localStorage.removeItem(LS_SALES);
+
   // ファイル入力をリセット
   ['master-file', 'sales-file'].forEach(id => {
     document.getElementById(id).value = '';
@@ -438,6 +452,62 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+// ─── ファイルデータ適用（LocalStorage復元とイベントで共用） ───────────────────────
+function applyMasterFiles(fileData) {
+  const listEl = document.getElementById('master-list');
+  listEl.innerHTML = '';
+  const rowSets = [];
+  for (const f of fileData) {
+    try {
+      rowSets.push(parseCSV(f.text));
+      const p = document.createElement('p');
+      p.textContent = `✓ ${f.name}`;
+      listEl.appendChild(p);
+    } catch (e) {
+      const p = document.createElement('p');
+      p.style.color = '#dc2626';
+      p.textContent = `✗ ${f.name}: ${e.message}`;
+      listEl.appendChild(p);
+    }
+  }
+  if (rowSets.length) {
+    masterData = buildMaster(mergeMasterRows(rowSets));
+    const summary = document.createElement('p');
+    summary.style.cssText = 'font-weight:700; margin-top:4px; color:#16a34a;';
+    summary.textContent = `合計 ${masterData.groupInfo.size} 商品グループ`;
+    listEl.appendChild(summary);
+    document.getElementById('master-box').classList.add('loaded');
+    listEl.classList.remove('hidden');
+  } else {
+    masterData = null;
+  }
+}
+
+function applySalesFiles(fileData) {
+  allSales = [];
+  const listEl = document.getElementById('sales-list');
+  listEl.innerHTML = '';
+  for (const f of fileData) {
+    try {
+      const sales = parseSales(parseCSV(f.text), f.name);
+      allSales = allSales.concat(sales);
+      const p = document.createElement('p');
+      p.textContent = `✓ ${f.name}（${sales.length} 件）`;
+      listEl.appendChild(p);
+    } catch (e) {
+      const p = document.createElement('p');
+      p.style.color = '#dc2626';
+      p.textContent = `✗ ${f.name}: ${e.message}`;
+      listEl.appendChild(p);
+    }
+  }
+  if (fileData.length) {
+    document.getElementById('sales-box').classList.add('loaded');
+    listEl.classList.remove('hidden');
+  }
+  months = [...new Set(allSales.map(r => r.monthKey))].sort();
+}
+
 // ─── DOM Wiring ───────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const masterInput = document.getElementById('master-file');
@@ -450,45 +520,13 @@ document.addEventListener('DOMContentLoaded', () => {
   masterInput.addEventListener('change', async () => {
     const files = Array.from(masterInput.files);
     if (!files.length) return;
-
-    const listEl = document.getElementById('master-list');
-    listEl.innerHTML = '';
-
-    const rowSets = [];
-    let totalGroups = 0;
-
+    const fileData = [];
     for (const file of files) {
-      try {
-        const text = await readFileText(file);
-        const rows = parseCSV(text);
-        rowSets.push(rows);
-        const p = document.createElement('p');
-        p.textContent = `✓ ${file.name}`;
-        listEl.appendChild(p);
-      } catch (e) {
-        const p = document.createElement('p');
-        p.style.color = '#dc2626';
-        p.textContent = `✗ ${file.name}: ${e.message}`;
-        listEl.appendChild(p);
-      }
+      const text = await readFileText(file);
+      fileData.push({ name: file.name, text });
     }
-
-    if (rowSets.length) {
-      const merged = mergeMasterRows(rowSets);
-      masterData = buildMaster(merged);
-      totalGroups = masterData.groupInfo.size;
-
-      const summary = document.createElement('p');
-      summary.style.cssText = 'font-weight:700; margin-top:4px; color:#16a34a;';
-      summary.textContent = `合計 ${totalGroups} 商品グループ`;
-      listEl.appendChild(summary);
-
-      document.getElementById('master-box').classList.add('loaded');
-      listEl.classList.remove('hidden');
-    } else {
-      masterData = null;
-    }
-
+    applyMasterFiles(fileData);
+    lsSave(LS_MASTER, fileData);
     checkReady();
   });
 
@@ -496,34 +534,13 @@ document.addEventListener('DOMContentLoaded', () => {
   salesInput.addEventListener('change', async () => {
     const files = Array.from(salesInput.files);
     if (!files.length) return;
-
-    allSales = [];
-    const listEl = document.getElementById('sales-list');
-    listEl.innerHTML = '';
-
+    const fileData = [];
     for (const file of files) {
-      try {
-        const text = await readFileText(file);
-        const rows = parseCSV(text);
-        const sales = parseSales(rows, file.name);
-        allSales = allSales.concat(sales);
-        const p = document.createElement('p');
-        p.textContent = `✓ ${file.name}（${sales.length} 件）`;
-        listEl.appendChild(p);
-      } catch (e) {
-        const p = document.createElement('p');
-        p.style.color = '#dc2626';
-        p.textContent = `✗ ${file.name}: ${e.message}`;
-        listEl.appendChild(p);
-      }
+      const text = await readFileText(file);
+      fileData.push({ name: file.name, text });
     }
-
-    if (files.length > 0) {
-      document.getElementById('sales-box').classList.add('loaded');
-      listEl.classList.remove('hidden');
-    }
-
-    months = [...new Set(allSales.map(r => r.monthKey))].sort();
+    applySalesFiles(fileData);
+    lsSave(LS_SALES, fileData);
     checkReady();
   });
 
@@ -582,4 +599,28 @@ document.addEventListener('DOMContentLoaded', () => {
       hint.textContent = 'Amazon売上CSVを読み込んでください';
     }
   }
+
+  // ── localStorage から前回データを復元 ─────────────────────────────────────
+  (function restoreFromStorage() {
+    const savedMaster = lsLoad(LS_MASTER);
+    const savedSales  = lsLoad(LS_SALES);
+    if (savedMaster) applyMasterFiles(savedMaster);
+    if (savedSales)  applySalesFiles(savedSales);
+    if (!allSales.length) return;
+
+    checkReady();
+    if (!masterData) {
+      const skuToGroup = new Map();
+      const groupInfo  = new Map();
+      for (const r of allSales) {
+        skuToGroup.set(r.sku, r.sku);
+        if (!groupInfo.has(r.sku)) groupInfo.set(r.sku, { names: [r.sku], displayName: r.sku });
+      }
+      masterData = { skuToGroup, groupInfo };
+    }
+    activeMonths.clear();
+    renderMonthChips();
+    refresh();
+    document.getElementById('results-section').classList.remove('hidden');
+  })();
 });

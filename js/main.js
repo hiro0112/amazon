@@ -216,25 +216,41 @@ function buildSkuRows(groupCode, selectedMonths) {
 const SIZE_ORDER = ['XS','SS','S','M','L','LL','XL','XXL','2XL','3L','3XL','4L','4XL','5L','5XL'];
 
 function looksLikeSize(s) {
+  if (!s) return false;
   if (SIZE_ORDER.includes(s.toUpperCase())) return true;
-  if (/^[A-G]\d{2,3}$/.test(s)) return true; // B65, C75 など
-  if (/^\d{2,3}[A-G]$/.test(s)) return true; // 65B, 75C など
+  if (/^[A-G]\d{2,3}$/i.test(s)) return true; // A70, B75, C80 など
+  if (/^\d{2,3}[A-G]$/i.test(s)) return true;  // 70A, 75B など
   return false;
 }
 
 function parseSkuVariants(skuName) {
-  const parts = skuName.split('_').map(p => p.trim()).filter(Boolean);
-  if (parts.length < 2) return null;
-  const last       = parts[parts.length - 1];
-  const secondLast = parts.length >= 3 ? parts[parts.length - 2] : null;
+  // _ とスペース（全角含む）をすべて区切り文字として分割
+  const tokens = skuName.split(/[_\s　]+/).map(t => t.trim()).filter(Boolean);
+  if (tokens.length < 2) return null;
+
+  const last       = tokens[tokens.length - 1];
+  const secondLast = tokens[tokens.length - 2];
+
+  // パターン A: [..., カラー, サイズ] — 末尾がサイズ
   if (looksLikeSize(last)) {
-    return { size: last.toUpperCase(), color: secondLast || '—' };
+    return { size: last.toUpperCase(), color: secondLast };
   }
-  if (secondLast && looksLikeSize(secondLast)) {
+
+  // パターン B: [..., サイズ, カラー] — 末尾から2番目がサイズ
+  if (looksLikeSize(secondLast)) {
     return { size: secondLast.toUpperCase(), color: last };
   }
-  // サイズ認識不可でも3分割できれば末尾をサイズ扱い
-  if (parts.length >= 3) {
+
+  // パターン C: 末尾2トークンにサイズがない → 右から全体をスキャン
+  for (let i = tokens.length - 3; i >= 1; i--) {
+    if (looksLikeSize(tokens[i])) {
+      // サイズの直後トークンをカラーとみなす
+      return { size: tokens[i].toUpperCase(), color: tokens[i + 1] };
+    }
+  }
+
+  // フォールバック: 3トークン以上あれば末尾2つを size/color とみなす
+  if (tokens.length >= 3) {
     return { size: last, color: secondLast };
   }
   return null;

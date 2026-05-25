@@ -63,6 +63,7 @@ async function readFileText(file) {
 // col[0]=商品コード, col[1]=商品名, col[22]=代表商品コード
 function buildMaster(rows) {
   const skuToGroup = new Map();
+  const skuToName  = new Map();
   const groupInfo  = new Map();
 
   for (let i = 1; i < rows.length; i++) {
@@ -72,6 +73,7 @@ function buildMaster(rows) {
     const grp  = c[22]?.trim() || sku;
     if (!sku) continue;
     skuToGroup.set(sku, grp);
+    if (name) skuToName.set(sku, name);
     if (!groupInfo.has(grp)) groupInfo.set(grp, { names: [] });
     if (name) groupInfo.get(grp).names.push(name);
   }
@@ -81,7 +83,7 @@ function buildMaster(rows) {
       ? PRODUCT_NAMES[code]
       : computeDisplayName(info.names, code);
   }
-  return { skuToGroup, groupInfo };
+  return { skuToGroup, skuToName, groupInfo };
 }
 
 // 複数マスタCSVをマージ（ヘッダーは先頭ファイルのみ使用）
@@ -182,6 +184,61 @@ function buildRows(agg, groupInfo, selectedMonths, groupAsin = new Map()) {
   return rows;
 }
 
+// ─── SKU 別内訳 ───────────────────────────────────────────────────────────────
+function buildSkuRows(groupCode, selectedMonths) {
+  const allSelected = selectedMonths.size === 0;
+  const skuMap = new Map();
+
+  for (const r of allSales) {
+    if ((masterData.skuToGroup.get(r.sku) || r.sku) !== groupCode) continue;
+    if (!allSelected && !selectedMonths.has(r.monthKey)) continue;
+    if (!skuMap.has(r.sku)) {
+      skuMap.set(r.sku, {
+        sku: r.sku,
+        name: masterData.skuToName?.get(r.sku) || r.sku,
+        total: 0,
+        units: 0,
+      });
+    }
+    const e = skuMap.get(r.sku);
+    e.total += r.total;
+    e.units += r.units;
+  }
+
+  return [...skuMap.values()]
+    .filter(r => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
+function openSkuModal(groupCode) {
+  const info    = masterData?.groupInfo.get(groupCode);
+  const title   = info?.displayName || groupCode;
+  const skuRows = buildSkuRows(groupCode, activeMonths);
+
+  document.getElementById('modal-title').textContent = title;
+
+  const maxTotal = skuRows[0]?.total || 1;
+  const tbody = document.getElementById('sku-body');
+  tbody.innerHTML = '';
+
+  skuRows.forEach((r, i) => {
+    const rank  = i + 1;
+    const pct   = Math.round((r.total / maxTotal) * 100);
+    const badgeClass = rank <= 3 ? ` r${rank}` : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-rank"><span class="rank-badge${badgeClass}">${rank}</span></td>
+      <td class="sku-name">${esc(r.name)}</td>
+      <td class="sales-amount">${r.total.toLocaleString()}</td>
+      <td class="units-count">${r.units.toLocaleString()}</td>
+      <td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('sku-modal').classList.remove('hidden');
+}
+
 // ─── Rendering: サマリーカード ────────────────────────────────────────────────
 function renderSummary(rows) {
   const totalSales = rows.reduce((s, r) => s + r.total, 0);
@@ -217,7 +274,7 @@ function renderTable(rows) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-rank"><span class="rank-badge${badgeClass}">${rank}</span></td>
-      <td class="product-name" title="${esc(r.name)}">${esc(r.name)}</td>
+      <td class="product-name product-name--link" title="${esc(r.name)}" data-group="${esc(r.groupCode)}">${esc(r.name)}</td>
       <td class="sales-amount">${r.total.toLocaleString()}</td>
       <td class="units-count">${r.units.toLocaleString()}</td>
       <td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
@@ -570,6 +627,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── データクリア ─────────────────────────────────────────────────────────────
   clearBtn.addEventListener('click', clearAll);
+
+  // ── SKU モーダル ─────────────────────────────────────────────────────────────
+  document.getElementById('table-body').addEventListener('click', e => {
+    const td = e.target.closest('td.product-name--link');
+    if (td) openSkuModal(td.dataset.group);
+  });
+  const modal = document.getElementById('sku-modal');
+  document.getElementById('modal-close').addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') modal.classList.add('hidden'); });
 
   // ── ドラッグ＆ドロップ ───────────────────────────────────────────────────────
   ['master-box', 'sales-box'].forEach(id => {

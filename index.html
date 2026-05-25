@@ -107,6 +107,30 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- SKU 内訳モーダル -->
+<div id="sku-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-title"></h3>
+      <button class="modal-close" id="modal-close" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-body">
+      <table id="sku-table">
+        <thead>
+          <tr>
+            <th class="col-rank">順位</th>
+            <th>SKU名</th>
+            <th class="col-sales">売上（円）</th>
+            <th class="col-units">販売個数</th>
+            <th class="col-bar"></th>
+          </tr>
+        </thead>
+        <tbody id="sku-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <script src="js/product-names.js"></script>
 <script src="js/main.js"></script>
 </body>

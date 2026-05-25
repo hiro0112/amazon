@@ -552,6 +552,118 @@ body {
 }
 
 /* ============================================================
+   Modal Tabs
+   ============================================================ */
+.modal-tabs {
+  display: flex;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+
+.modal-tab {
+  padding: 10px 18px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.modal-tab:hover { color: #374151; }
+.modal-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+
+/* ============================================================
+   Color × Size Matrix
+   ============================================================ */
+.matrix-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.matrix-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.mx-corner {
+  background: #f1f5f9;
+  padding: 8px 14px;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+  border-right: 2px solid #e2e8f0;
+  text-align: center;
+}
+
+.mx-size {
+  background: #f1f5f9;
+  padding: 8px 14px;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+  text-align: center;
+  min-width: 56px;
+}
+
+.mx-total {
+  background: #eef2f7;
+  padding: 8px 14px;
+  font-weight: 700;
+  color: #374151;
+  border-bottom: 2px solid #e2e8f0;
+  border-left: 2px solid #e2e8f0;
+  text-align: center;
+}
+
+.mx-color {
+  padding: 7px 14px;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #f0f4f8;
+  border-right: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.mx-cell {
+  padding: 7px 10px;
+  text-align: center;
+  border-bottom: 1px solid #f0f4f8;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 56px;
+  transition: filter 0.1s;
+}
+.mx-cell:hover { filter: brightness(0.93); }
+
+.mx-total-cell {
+  padding: 7px 14px;
+  text-align: center;
+  font-weight: 700;
+  border-bottom: 1px solid #f0f4f8;
+  border-left: 2px solid #e2e8f0;
+  background: #f8fafc;
+  color: #374151;
+}
+
+.mx-totals .mx-color { border-top: 2px solid #e2e8f0; background: #eef2f7; }
+.mx-totals .mx-total-cell { border-top: 2px solid #e2e8f0; background: #eef2f7; }
+.mx-totals td { border-top: 2px solid #e2e8f0; background: #eef2f7; font-weight: 700; }
+.mx-total-label { color: #374151; }
+
+.matrix-empty {
+  color: #64748b;
+  font-size: 13px;
+  padding: 24px 0;
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* ============================================================
    Scrollbar
    ============================================================ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

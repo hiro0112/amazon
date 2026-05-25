@@ -114,19 +114,28 @@
       <h3 class="modal-title" id="modal-title"></h3>
       <button class="modal-close" id="modal-close" aria-label="閉じる">×</button>
     </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-tab="list">ランキング</button>
+      <button class="modal-tab" data-tab="matrix">カラー × サイズ</button>
+    </div>
     <div class="modal-body">
-      <table id="sku-table">
-        <thead>
-          <tr>
-            <th class="col-rank">順位</th>
-            <th>SKU名</th>
-            <th class="col-sales">売上（円）</th>
-            <th class="col-units">販売個数</th>
-            <th class="col-bar"></th>
-          </tr>
-        </thead>
-        <tbody id="sku-body"></tbody>
-      </table>
+      <div id="tab-list">
+        <table id="sku-table">
+          <thead>
+            <tr>
+              <th class="col-rank">順位</th>
+              <th>SKU名</th>
+              <th class="col-sales">売上（円）</th>
+              <th class="col-units">販売個数</th>
+              <th class="col-bar"></th>
+            </tr>
+          </thead>
+          <tbody id="sku-body"></tbody>
+        </table>
+      </div>
+      <div id="tab-matrix" class="hidden">
+        <div id="matrix-container"></div>
+      </div>
     </div>
   </div>
 </div>

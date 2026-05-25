@@ -12,6 +12,8 @@ let months       = [];    // sorted unique monthKeys
 let chartInst    = null;
 let activeMonths = new Set(); // empty = 全期間
 
+let currentModalGroup = null; // モーダル表示中の商品グループコード
+
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
 const LS_MASTER = 'amazon_master_v1';
 const LS_SALES  = 'amazon_sales_v1';
@@ -210,7 +212,129 @@ function buildSkuRows(groupCode, selectedMonths) {
     .sort((a, b) => b.total - a.total);
 }
 
+// ─── カラー × サイズ マトリックス ────────────────────────────────────────────
+const SIZE_ORDER = ['XS','SS','S','M','L','LL','XL','XXL','2XL','3L','3XL','4L','4XL','5L','5XL'];
+
+function looksLikeSize(s) {
+  if (SIZE_ORDER.includes(s.toUpperCase())) return true;
+  if (/^[A-G]\d{2,3}$/.test(s)) return true; // B65, C75 など
+  if (/^\d{2,3}[A-G]$/.test(s)) return true; // 65B, 75C など
+  return false;
+}
+
+function parseSkuVariants(skuName) {
+  const parts = skuName.split('_').map(p => p.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  const last       = parts[parts.length - 1];
+  const secondLast = parts.length >= 3 ? parts[parts.length - 2] : null;
+  if (looksLikeSize(last)) {
+    return { size: last.toUpperCase(), color: secondLast || '—' };
+  }
+  if (secondLast && looksLikeSize(secondLast)) {
+    return { size: secondLast.toUpperCase(), color: last };
+  }
+  // サイズ認識不可でも3分割できれば末尾をサイズ扱い
+  if (parts.length >= 3) {
+    return { size: last, color: secondLast };
+  }
+  return null;
+}
+
+function sizeCompare(a, b) {
+  const ai = SIZE_ORDER.indexOf(a.toUpperCase());
+  const bi = SIZE_ORDER.indexOf(b.toUpperCase());
+  if (ai !== -1 && bi !== -1) return ai - bi;
+  if (ai !== -1) return -1;
+  if (bi !== -1) return 1;
+  const an = parseInt(a.replace(/\D/g, ''), 10) || 0;
+  const bn = parseInt(b.replace(/\D/g, ''), 10) || 0;
+  return an !== bn ? an - bn : a.localeCompare(b, 'ja');
+}
+
+function buildColorSizeMatrix(skuRows) {
+  const cells      = new Map(); // `color__size` → units
+  const colorTotal = new Map();
+  const sizeSet    = new Set();
+  let parseable = 0;
+
+  for (const r of skuRows) {
+    const v = parseSkuVariants(r.name);
+    if (!v) continue;
+    parseable++;
+    const key = `${v.color}__${v.size}`;
+    cells.set(key, (cells.get(key) || 0) + r.units);
+    colorTotal.set(v.color, (colorTotal.get(v.color) || 0) + r.units);
+    sizeSet.add(v.size);
+  }
+
+  if (parseable === 0) return null;
+
+  const sortedColors = [...colorTotal.keys()].sort((a, b) => colorTotal.get(b) - colorTotal.get(a));
+  const sortedSizes  = [...sizeSet].sort(sizeCompare);
+
+  return { sortedColors, sortedSizes, cells, colorTotal };
+}
+
+function renderMatrix(groupCode) {
+  const skuRows = buildSkuRows(groupCode, activeMonths);
+  const matrix  = buildColorSizeMatrix(skuRows);
+  const el      = document.getElementById('matrix-container');
+
+  if (!matrix) {
+    el.innerHTML = '<p class="matrix-empty">SKU名からカラー・サイズを読み取れませんでした。<br>商品コードCSVのSKU名が「商品名_カラー_サイズ」形式であれば表示されます。</p>';
+    return;
+  }
+
+  const { sortedColors, sortedSizes, cells } = matrix;
+  const maxUnits = Math.max(...cells.values(), 1);
+
+  let html = '<div class="matrix-scroll"><table class="matrix-table"><thead><tr>';
+  html += '<th class="mx-corner">カラー ╲ サイズ</th>';
+  sortedSizes.forEach(s => { html += `<th class="mx-size">${esc(s)}</th>`; });
+  html += '<th class="mx-total">合計</th></tr></thead><tbody>';
+
+  sortedColors.forEach(color => {
+    let rowTotal = 0;
+    html += `<tr><td class="mx-color">${esc(color)}</td>`;
+    sortedSizes.forEach(size => {
+      const u = cells.get(`${color}__${size}`) || 0;
+      rowTotal += u;
+      const intensity = u / maxUnits;
+      const bg   = u > 0 ? `rgba(37,99,235,${(0.12 + intensity * 0.75).toFixed(2)})` : '#f1f5f9';
+      const fg   = intensity > 0.45 ? '#fff' : '#1e2a3a';
+      html += `<td class="mx-cell" style="background:${bg};color:${fg}">${u > 0 ? u : ''}</td>`;
+    });
+    html += `<td class="mx-total-cell">${rowTotal}</td></tr>`;
+  });
+
+  // 合計行
+  html += '<tr class="mx-totals"><td class="mx-color mx-total-label">合計</td>';
+  let grand = 0;
+  sortedSizes.forEach(size => {
+    let col = 0;
+    sortedColors.forEach(color => { col += cells.get(`${color}__${size}`) || 0; });
+    grand += col;
+    html += `<td class="mx-total-cell">${col}</td>`;
+  });
+  html += `<td class="mx-total-cell">${grand}</td></tr>`;
+  html += '</tbody></table></div>';
+
+  el.innerHTML = html;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.getElementById('tab-list').classList.toggle('hidden', tab !== 'list');
+  document.getElementById('tab-matrix').classList.toggle('hidden', tab !== 'matrix');
+  if (tab === 'matrix' && currentModalGroup) renderMatrix(currentModalGroup);
+}
+
 function openSkuModal(groupCode) {
+  currentModalGroup = groupCode;
+  switchTab('list');
+
   const info    = masterData?.groupInfo.get(groupCode);
   const title   = info?.displayName || groupCode;
   const skuRows = buildSkuRows(groupCode, activeMonths);
@@ -637,6 +761,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modal-close').addEventListener('click', () => modal.classList.add('hidden'));
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') modal.classList.add('hidden'); });
+  document.querySelectorAll('.modal-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
 
   // ── ドラッグ＆ドロップ ───────────────────────────────────────────────────────
   ['master-box', 'sales-box'].forEach(id => {

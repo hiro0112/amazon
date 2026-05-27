@@ -62,7 +62,7 @@ async function readFileText(file) {
 }
 
 // ─── Product Master (商品コードCSV) ───────────────────────────────────────────
-// col[0]=商品コード, col[1]=商品名, col[22]=代表商品コード
+// col[0]=商品コード, col[1]=商品名, col[21]=代表商品コード
 function buildMaster(rows) {
   const skuToGroup = new Map();
   const skuToName  = new Map();
@@ -72,7 +72,7 @@ function buildMaster(rows) {
     const c = rows[i];
     const sku  = c[0]?.trim();
     const name = c[1]?.trim();
-    const grp  = c[22]?.trim() || sku;
+    const grp  = c[21]?.trim() || sku;
     if (!sku) continue;
     skuToGroup.set(sku, grp);
     if (name) skuToName.set(sku, name);
